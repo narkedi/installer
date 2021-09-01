@@ -2,11 +2,13 @@ Get-ChildItem -Path .\ -Filter *.zip -File -Name| ForEach-Object {
   $filename = [System.IO.Path]::GetFileName($_)
 
   # validate that the zip file is OpenJDK with an optional major version number
-  $openjdk_filename_regex = "^OpenJDK(?<major>\d*)"
-  $openjdk_found = $filename -match $openjdk_filename_regex
+  $openjdk_filename_regex = "^ibm-semeru-.*-j.*_.*_windows_(?<major>\d*).*\.zip"
+    $openjdk_found = $filename -match $openjdk_filename_regex
   if (!$openjdk_found) {
     echo "filename : $filename doesn't match regex $openjdk_filename_regex"
     exit 2
+  } else {
+    echo "Filename : $filename matches major : $major matches : $Matches.major $matches.major"
   }
 
   $openjdk_basedir="OpenJDK"

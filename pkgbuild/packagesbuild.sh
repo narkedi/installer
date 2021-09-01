@@ -20,9 +20,9 @@ SIGN_OPTION=
 SIGN_CMD=
 NOTARIZE_OPTION=
 IDENTIFIER=
-VENDOR="adoptopenjdk"
-PACKAGE_NAME="AdoptOpenJDK"
-LOGO="Resources/adoptopenjdk.png"
+VENDOR="temurin"
+PACKAGE_NAME="Eclipse Temurin"
+LOGO="Resources/ibm.png"
 
 while test $# -gt 0; do
   case "$1" in
@@ -35,7 +35,7 @@ while test $# -gt 0; do
       echo "-o, --output_directory   name of the pkg file>"
       echo "--jvm                    hotspot or openj9"
       echo "--type                   jdk or jre"
-      echo "--vendor                 adoptopenjdk, dragonwell etc"
+      echo "--vendor                 adoptium, dragonwell etc"
       echo "--package-name           full name of the package (shown in the title)"
       echo "--logo                   Relative path to a custom logo (bottom left)"
       echo "--identifier             override the identifier e.g net.adoptopenjdk.11.jdk"
@@ -105,20 +105,20 @@ while test $# -gt 0; do
   esac
 done
 
-mkdir -p "${INPUT_DIRECTORY}/Contents/Home/bundle/Libraries"
-if [ -f "${INPUT_DIRECTORY}/Contents/Home/lib/server/libjvm.dylib" ]; then
-  cp "${INPUT_DIRECTORY}/Contents/Home/lib/server/libjvm.dylib" "${INPUT_DIRECTORY}/Contents/Home/bundle/Libraries/libserver.dylib"
-else
-  cp "${INPUT_DIRECTORY}/Contents/Home/jre/lib/server/libjvm.dylib" "${INPUT_DIRECTORY}/Contents/Home/bundle/Libraries/libserver.dylib"
-fi
-
-if [ $TYPE == "jre" ]; then
-    /usr/libexec/PlistBuddy -c "Add :JavaVM:JVMCapabilities array" "${INPUT_DIRECTORY}/Contents/Info.plist"
-    /usr/libexec/PlistBuddy -c "Add :JavaVM:JVMCapabilities:0 string CommandLine" "${INPUT_DIRECTORY}/Contents/Info.plist"
-fi
-
 case $JVM in
   openj9)
+    if [ -z "$IDENTIFIER" ]; then
+      IDENTIFIER="net.${VENDOR}.${MAJOR_VERSION}.${TYPE}"
+    fi
+    DIRECTORY="${VENDOR}-${MAJOR_VERSION}.${TYPE}"
+    BUNDLE="${PACKAGE_NAME}"
+    #cp Licenses/license-OpenJ9.en-us.rtf Resources/license.rtf
+    case $TYPE in
+      jre) BUNDLE="${PACKAGE_NAME} (JRE)" ;;
+      jdk) BUNDLE="${PACKAGE_NAME}" ;;
+    esac
+    ;;
+  ibm)
     if [ -z "$IDENTIFIER" ]; then
       IDENTIFIER="net.${VENDOR}.${MAJOR_VERSION}-openj9.${TYPE}"
     fi
@@ -143,16 +143,6 @@ case $JVM in
     ;;
 esac
 
-/usr/libexec/PlistBuddy -c "Set :CFBundleGetInfoString ${BUNDLE} ${FULL_VERSION}" "${INPUT_DIRECTORY}/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleName ${BUNDLE} ${MAJOR_VERSION}" "${INPUT_DIRECTORY}/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${IDENTIFIER}" "${INPUT_DIRECTORY}/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :JavaVM:JVMPlatformVersion ${FULL_VERSION}" "${INPUT_DIRECTORY}/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :JavaVM:JVMVendor ${PACKAGE_NAME}" "${INPUT_DIRECTORY}/Contents/Info.plist"
-
-# Fix comes from https://apple.stackexchange.com/a/211033 to associate JAR files
-/usr/libexec/PlistBuddy -c "Add :JavaVM:JVMCapabilities:1 string JNI" "${INPUT_DIRECTORY}/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Add :JavaVM:JVMCapabilities:2 string BundledApp" "${INPUT_DIRECTORY}/Contents/Info.plist"
-
 OUTPUT_FILE=$(basename "$OUTPUT_DIRECTORY" | cut -f 1 -d '.')
 
 rm -rf *.pkg build/*.pkg distribution.xml Resources/en.lproj/welcome.html Resources/en.lproj/conclusion.html OpenJDKPKG.pkgproj "${DIRECTORY}"
@@ -162,7 +152,7 @@ cp -R "${INPUT_DIRECTORY}" "${DIRECTORY}"
 if [ ! -z "$SIGN_OPTION" ]; then
     xattr -cr .
     security unlock-keychain -p `cat ~/.password` login.keychain-db
-    /usr/bin/codesign --verbose=4 --deep --force -s "Developer ID Application: London Jamocha Community CIC" ${DIRECTORY}
+    /usr/bin/codesign --verbose=4 --deep --force -s - ${DIRECTORY}
 fi
 
 cat OpenJDKPKG.pkgproj.template  \
