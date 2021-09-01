@@ -27,14 +27,14 @@ IF NOT DEFINED PRODUCT_CATEGORY SET ERR=9
 IF NOT %ERR% == 0 ( ECHO Missing args/variable ERR:%ERR% && GOTO FAILED )
 
 REM default vendor information
-IF NOT DEFINED VENDOR SET VENDOR=AdoptOpenJDK
-IF NOT DEFINED VENDOR_BRANDING SET VENDOR_BRANDING=AdoptOpenJDK
-IF NOT DEFINED VENDOR_BRANDING_LOGO SET VENDOR_BRANDING_LOGO=$(var.SetupResourcesDir)\logo.ico
-IF NOT DEFINED VENDOR_BRANDING_BANNER SET VENDOR_BRANDING_BANNER=$(var.SetupResourcesDir)\wix-banner.bmp
-IF NOT DEFINED VENDOR_BRANDING_DIALOG SET VENDOR_BRANDING_DIALOG=$(var.SetupResourcesDir)\wix-dialog.bmp
-IF NOT DEFINED PRODUCT_HELP_LINK SET PRODUCT_HELP_LINK=https://github.com/AdoptOpenJDK/openjdk-build/issues/new/choose
-IF NOT DEFINED PRODUCT_SUPPORT_LINK SET PRODUCT_SUPPORT_LINK=https://adoptopenjdk.net/support.html
-IF NOT DEFINED PRODUCT_UPDATE_INFO_LINK SET PRODUCT_UPDATE_INFO_LINK=https://adoptopenjdk.net/releases.html
+IF NOT DEFINED VENDOR SET VENDOR=Semeru
+IF NOT DEFINED VENDOR_BRANDING SET VENDOR_BRANDING=IBM Semeru Runtime Open Edition
+IF NOT DEFINED VENDOR_BRANDING_LOGO SET VENDOR_BRANDING_LOGO=$(var.SetupResourcesDir)\ibm.ico
+IF NOT DEFINED VENDOR_BRANDING_BANNER SET VENDOR_BRANDING_BANNER=$(var.SetupResourcesDir)\wix-banner-ibm.jpg
+IF NOT DEFINED VENDOR_BRANDING_DIALOG SET VENDOR_BRANDING_DIALOG=$(var.SetupResourcesDir)\wix-dialog-ibm.jpg
+IF NOT DEFINED PRODUCT_HELP_LINK SET PRODUCT_HELP_LINK=https://github.com/eclipse-openj9/openj9/issues/new/choose
+IF NOT DEFINED PRODUCT_SUPPORT_LINK SET PRODUCT_SUPPORT_LINK=https://developer.ibm.com/languages/java/semeru-runtime/support
+IF NOT DEFINED PRODUCT_UPDATE_INFO_LINK SET PRODUCT_UPDATE_INFO_LINK=https://ibm.com/semeruruntime
 
 REM This needs tidying up, it's got out of control now
 IF NOT "%ARCH%" == "x64" (
@@ -99,16 +99,8 @@ REM Configure available SDK version:
 REM See folder e.g. "C:\Program Files (x86)\Windows Kits\[10]\bin\[10.0.16299.0]\x64"
 SET WIN_SDK_MAJOR_VERSION=10
 SET WIN_SDK_FULL_VERSION=10.0.17763.0
-
-REM find all *.wxi.template,*.wxl.template,*.wxs.template files and replace text with configurations
-SETLOCAL ENABLEDELAYEDEXPANSION
-FOR /f %%i IN ('dir /s /b *.wxi.template,*.wxl.template,*.wxs.template') DO (
-    SET INPUT_FILE=%%i
-    SET OUTPUT_FILE=!INPUT_FILE:.template=%!
-    ECHO string replacement input !INPUT_FILE! output !OUTPUT_FILE!
-    powershell -Command "(gc -Raw -encoding utf8 %%i) -replace '{vendor}', '!VENDOR!' -replace '{vendor_branding_logo}', '!VENDOR_BRANDING_LOGO!' -replace '{vendor_branding_banner}', '!VENDOR_BRANDING_BANNER!' -replace '{vendor_branding_dialog}', '!VENDOR_BRANDING_DIALOG!' -replace '{vendor_branding}', '!VENDOR_BRANDING!' -replace '{product_help_link}', '!PRODUCT_HELP_LINK!' -replace '{product_support_link}', '!PRODUCT_SUPPORT_LINK!' -replace '{product_update_info_link}', '!PRODUCT_UPDATE_INFO_LINK!' | Out-File -encoding utf8 !OUTPUT_FILE!"
-)
-ENDLOCAL
+SET WORKDIR=Workdir\
+mkdir %WORKDIR%
 
 REM
 REM Nothing below this line need to be changed normally.
@@ -167,19 +159,33 @@ FOR %%A IN (%ARCH%) DO (
             SET REPRO_DIR=!REPRO_DIR!-!PRODUCT_CATEGORY!)
             ECHO looking for !REPRO_DIR!
         IF EXIST "!REPRO_DIR!" (
-            goto CONTINUE
+            ECHO "GOTO CONTINUE"
+            goto CONTINUE 
         )
     )
     
     ECHO SOURCE Dir not found / failed
     ECHO Listing directory :
     dir /a:d /s /b /o:n SourceDir
-    GOTO FAILED
+    GOTO FAILED 
 
     :CONTINUE
     ECHO Source dir used : !REPRO_DIR!
 
     SET OUTPUT_BASE_FILENAME=!PRODUCT_SKU!!PRODUCT_MAJOR_VERSION!-!PRODUCT_CATEGORY!_!FOLDER_PLATFORM!_windows_!PACKAGE_TYPE!-!PRODUCT_FULL_VERSION!
+    REM find all *.wxi.template,*.wxl.template,*.wxs.template files and replace text with configurations
+    FOR /f %%i IN ('dir /s /b *.wxi.template, *.Base.*.wxl.template *.!JVM!.*.wxl.template,*.wxs.template') DO (
+        SET INPUT_FILE=%%~ni
+        REM Prevent concurrency issues if multiple builds are running in parallel.
+        SET OUTPUT_FILE=%WORKDIR%!OUTPUT_BASE_FILENAME!-!INPUT_FILE:.template=%!
+        ECHO string replacement input !INPUT_FILE! output !OUTPUT_FILE!
+        powershell -Command "(gc -Raw -encoding utf8 %%i) -replace '{vendor}', '!VENDOR!' -replace '{vendor_branding_logo}', '!VENDOR_BRANDING_LOGO!' -replace '{vendor_branding_banner}', '!VENDOR_BRANDING_BANNER!' -replace '{vendor_branding_dialog}', '!VENDOR_BRANDING_DIALOG!' -replace '{vendor_branding}', '!VENDOR_BRANDING!' -replace '{product_help_link}', '!PRODUCT_HELP_LINK!' -replace '{product_support_link}', '!PRODUCT_SUPPORT_LINK!' -replace '{product_update_info_link}', '!PRODUCT_UPDATE_INFO_LINK!' | Out-File -encoding utf8 !OUTPUT_FILE!"
+	IF ERRORLEVEL 1 (
+	    ECHO Unable to make string replacement
+	    GOTO FAILED
+	)
+    )
+
     SET CACHE_BASE_FOLDER=Cache
     REM Each build his own cache for concurrent build
     SET CACHE_FOLDER=!CACHE_BASE_FOLDER!\!OUTPUT_BASE_FILENAME!
@@ -199,7 +205,7 @@ FOR %%A IN (%ARCH%) DO (
     ) ELSE (
         REM It will be better if we can generate "Name-based UUID" as specified here https://tools.ietf.org/html/rfc4122#section-4.3
         REM but it's too difficult so fallback to random like guid based on md5 hash with getGuid.ps1
-        REM We use md5 hash to always get the same PRODUCT_UPGRADE_CODE(GUID) for each MSI build with same GUID_SSED to allow upgrade from AdoptOpenJDK
+        REM We use md5 hash to always get the same PRODUCT_UPGRADE_CODE(GUID) for each MSI build with same GUID_SSED to allow upgrade from Adoptium
         REM IF PRODUCT_UPGRADE_CODE change from build to build, upgrade is not proposed by Windows Installer
         REM Never change what compose SOURCE_TEXT_GUID and args0 for getGuid.ps1 or you will never get the same GUID as previous build and MSI upgradable feature wont work
         SET SOURCE_TEXT_GUID=!PRODUCT_CATEGORY!-!PRODUCT_MAJOR_VERSION!-!PLATFORM!-!PACKAGE_TYPE!
@@ -210,15 +216,12 @@ FOR %%A IN (%ARCH%) DO (
         )
     )
 
-    REM Prevent concurrency issues if multiple builds are running in parallel.
-	ECHO copy "Main.!PACKAGE_TYPE!.wxs"
-    COPY /Y "Main.!PACKAGE_TYPE!.wxs" "Main-!OUTPUT_BASE_FILENAME!.wxs"
 
     REM Build with extra Source Code feature (needs work)
     REM "!WIX!bin\heat.exe" file "!REPRO_DIR!\lib\src.zip" -out Src-!OUTPUT_BASE_FILENAME!.wxs -gg -srd -cg "SrcFiles" -var var.ReproDir -dr INSTALLDIR -platform !PLATFORM!
     REM "!WIX!bin\heat.exe" dir "!REPRO_DIR!" -out Files-!OUTPUT_BASE_FILENAME!.wxs -t "!SETUP_RESOURCES_DIR!\heat.tools.xslt" -gg -sfrag -scom -sreg -srd -ke -cg "AppFiles" -var var.ProductMajorVersion -var var.ProductMinorVersion -var var.ProductVersionString -var var.MSIProductVersion -var var.ReproDir -dr INSTALLDIR -platform !PLATFORM!
-    REM "!WIX!bin\candle.exe" -arch !PLATFORM! Main-!OUTPUT_BASE_FILENAME!.wxs Files-!OUTPUT_BASE_FILENAME!.wxs Src-!OUTPUT_BASE_FILENAME!.wxs -ext WixUIExtension -ext WixUtilExtension -dProductSku="!PRODUCT_SKU!" -dProductMajorVersion="!PRODUCT_MAJOR_VERSION!" -dProductMinorVersion="!PRODUCT_MINOR_VERSION!" -dProductVersionString="!PRODUCT_SHORT_VERSION!" -dMSIProductVersion="!MSI_PRODUCT_VERSION!" -dProductId="!PRODUCT_ID!" -dReproDir="!REPRO_DIR!" -dSetupResourcesDir="!SETUP_RESOURCES_DIR!" -dCulture="!CULTURE!"
-    REM "!WIX!bin\light.exe" !MSI_VALIDATION_OPTION! Main-!OUTPUT_BASE_FILENAME!.wixobj Files-!OUTPUT_BASE_FILENAME!.wixobj Src-!OUTPUT_BASE_FILENAME!.wixobj -cc !CACHE_FOLDER! -ext WixUIExtension -ext WixUtilExtension -spdb -out "ReleaseDir\!OUTPUT_BASE_FILENAME!.msi" -loc "Lang\!PRODUCT_SKU!.Base.!CULTURE!.wxl" -loc "Lang\!PRODUCT_SKU!.!PACKAGE_TYPE!.!CULTURE!.wxl" -cultures:!CULTURE!
+    REM "!WIX!bin\candle.exe" -arch !PLATFORM! !OUTPUT_BASE_FILENAME!-Main.wxs Files-!OUTPUT_BASE_FILENAME!.wxs Src-!OUTPUT_BASE_FILENAME!.wxs -ext WixUIExtension -ext WixUtilExtension -dProductSku="!PRODUCT_SKU!" -dProductMajorVersion="!PRODUCT_MAJOR_VERSION!" -dProductMinorVersion="!PRODUCT_MINOR_VERSION!" -dProductVersionString="!PRODUCT_SHORT_VERSION!" -dMSIProductVersion="!MSI_PRODUCT_VERSION!" -dProductId="!PRODUCT_ID!" -dReproDir="!REPRO_DIR!" -dSetupResourcesDir="!SETUP_RESOURCES_DIR!" -dCulture="!CULTURE!"
+    REM "!WIX!bin\light.exe" !MSI_VALIDATION_OPTION! Main-!OUTPUT_BASE_FILENAME!.wixobj Files-!OUTPUT_BASE_FILENAME!.wixobj Src-!OUTPUT_BASE_FILENAME!.wixobj -cc !CACHE_FOLDER! -ext WixUIExtension -ext WixUtilExtension -spdb -out "ReleaseDir\!OUTPUT_BASE_FILENAME!.msi" -loc "Lang\!OUTPUT_BASE_FILENAME!-!PRODUCT_SKU!.Base.!CULTURE!.wxl" -loc "Lang\!OUTPUT_BASE_FILENAME!-!PRODUCT_SKU!.!PACKAGE_TYPE!.!CULTURE!.wxl" -cultures:!CULTURE!
 
     REM Clean .cab cache for each run .. Cache is only used inside BuildSetupTranslationTransform.cmd to speed up MST generation
     IF EXIST !CACHE_FOLDER! rmdir /S /Q !CACHE_FOLDER!
@@ -239,7 +242,7 @@ FOR %%A IN (%ARCH%) DO (
                 ECHO IcedTeaWeb Directory Exist!
                 SET BUNDLE_ICEDTEAWEB=true
                 SET ITW_WXS="IcedTeaWeb-!OUTPUT_BASE_FILENAME!.wxs"
-                SET ITW_WIXOBJ="IcedTeaWeb-!OUTPUT_BASE_FILENAME!.wixobj"
+                SET ITW_WIXOBJ=%WORKDIR%IcedTeaWeb-!OUTPUT_BASE_FILENAME!.wixobj
                 ECHO HEAT
                 "!WIX!bin\heat.exe" dir "!ICEDTEAWEB_DIR!" -out !ITW_WXS! -t "!SETUP_RESOURCES_DIR!\heat.icedteaweb.xslt" -gg -sfrag -scom -sreg -srd -ke -cg "IcedTeaWebFiles" -var var.IcedTeaWebDir -dr INSTALLDIR -platform !PLATFORM!
                 IF ERRORLEVEL 1 (
@@ -254,7 +257,7 @@ FOR %%A IN (%ARCH%) DO (
     
     ECHO HEAT
     @ECHO ON
-    "!WIX!bin\heat.exe" dir "!REPRO_DIR!" -out Files-!OUTPUT_BASE_FILENAME!.wxs -gg -sfrag -scom -sreg -srd -ke -cg "AppFiles" -var var.ProductMajorVersion -var var.ProductMinorVersion -var var.ProductVersionString -var var.MSIProductVersion -var var.ReproDir -dr INSTALLDIR -platform !PLATFORM!
+    "!WIX!bin\heat.exe" dir "!REPRO_DIR!" -out %WORKDIR%!OUTPUT_BASE_FILENAME!-Files.wxs -gg -sfrag -scom -sreg -srd -ke -cg "AppFiles" -var var.ProductMajorVersion -var var.ProductMinorVersion -var var.ProductVersionString -var var.MSIProductVersion -var var.ReproDir -dr INSTALLDIR -platform !PLATFORM!
     IF ERRORLEVEL 1 (
         ECHO Failed to generating Windows Installer XML Source files ^(.wxs^)
         GOTO FAILED
@@ -263,18 +266,20 @@ FOR %%A IN (%ARCH%) DO (
 
     ECHO CANDLE
     @ECHO ON
-    "!WIX!bin\candle.exe" -arch !PLATFORM! Main-!OUTPUT_BASE_FILENAME!.wxs Files-!OUTPUT_BASE_FILENAME!.wxs !ITW_WXS! -ext WixUIExtension -ext WixUtilExtension -dIcedTeaWebDir="!ICEDTEAWEB_DIR!" -dProductSku="!PRODUCT_SKU!" -dProductMajorVersion="!PRODUCT_MAJOR_VERSION!" -dProductMinorVersion="!PRODUCT_MINOR_VERSION!" -dProductVersionString="!PRODUCT_SHORT_VERSION!" -dMSIProductVersion="!MSI_PRODUCT_VERSION!" -dProductId="!PRODUCT_ID!" -dProductUpgradeCode="!PRODUCT_UPGRADE_CODE!" -dReproDir="!REPRO_DIR!" -dSetupResourcesDir="!SETUP_RESOURCES_DIR!" -dCulture="!CULTURE!" -dJVM="!PACKAGE_TYPE!"
+    "!WIX!bin\candle.exe" -arch !PLATFORM! -out %WORKDIR% %WORKDIR%!OUTPUT_BASE_FILENAME!-Main.wxs %WORKDIR%!OUTPUT_BASE_FILENAME!-Files.wxs !ITW_WXS! -ext WixUIExtension -ext WixUtilExtension -dIcedTeaWebDir="!ICEDTEAWEB_DIR!" -dOutputBaseFilename="!OUTPUT_BASE_FILENAME!" -dProductSku="!PRODUCT_SKU!" -dProductMajorVersion="!PRODUCT_MAJOR_VERSION!" -dProductMinorVersion="!PRODUCT_MINOR_VERSION!" -dProductVersionString="!PRODUCT_SHORT_VERSION!" -dMSIProductVersion="!MSI_PRODUCT_VERSION!" -dProductId="!PRODUCT_ID!" -dProductUpgradeCode="!PRODUCT_UPGRADE_CODE!" -dReproDir="!REPRO_DIR!" -dSetupResourcesDir="!SETUP_RESOURCES_DIR!" -dCulture="!CULTURE!" -dJVM="!PACKAGE_TYPE!"
     IF ERRORLEVEL 1 (
         ECHO Failed to preprocesses and compiles WiX source files into object files ^(.wixobj^)
+        dir /s /b /o:n %WORKDIR%
         GOTO FAILED
     )
     @ECHO OFF
 
     ECHO LIGHT
     @ECHO ON
-    "!WIX!bin\light.exe" Main-!OUTPUT_BASE_FILENAME!.wixobj Files-!OUTPUT_BASE_FILENAME!.wixobj !ITW_WIXOBJ! !MSI_VALIDATION_OPTION! -cc !CACHE_FOLDER! -ext WixUIExtension -ext WixUtilExtension -spdb -out "ReleaseDir\!OUTPUT_BASE_FILENAME!.msi" -loc "Lang\!PRODUCT_SKU!.Base.!CULTURE!.wxl" -loc "Lang\!PRODUCT_SKU!.!PACKAGE_TYPE!.!CULTURE!.wxl" -cultures:!CULTURE!
+    "!WIX!bin\light.exe" %WORKDIR%!OUTPUT_BASE_FILENAME!-Main.wixobj %WORKDIR%!OUTPUT_BASE_FILENAME!-Files.wixobj !ITW_WIXOBJ! !MSI_VALIDATION_OPTION! -cc !CACHE_FOLDER! -ext WixUIExtension -ext WixUtilExtension -spdb -out "ReleaseDir\!OUTPUT_BASE_FILENAME!.msi" -loc "%WORKDIR%!OUTPUT_BASE_FILENAME!-!PRODUCT_SKU!.Base.!CULTURE!.wxl" -loc "%WORKDIR%!OUTPUT_BASE_FILENAME!-!PRODUCT_SKU!.!PACKAGE_TYPE!.!CULTURE!.wxl" -cultures:!CULTURE!
     IF ERRORLEVEL 1 (
         ECHO Failed to links and binds one or more .wixobj files and creates a Windows Installer database ^(.msi or .msm^)
+        dir /s /b /o:n
         GOTO FAILED
     )
     @ECHO OFF
@@ -322,9 +327,14 @@ FOR %%A IN (%ARCH%) DO (
             for /F %%s IN (serverTimestamp.config) do (
 	        ECHO try !timestampErrors! / sha256 / timestamp server : %%s
 		REM Always hide password here
-		@ECHO OFF
-                "%ProgramFiles(x86)%\Windows Kits\%WIN_SDK_MAJOR_VERSION%\bin\%WIN_SDK_FULL_VERSION%\x64\signtool.exe" sign -f "%SIGNING_CERTIFICATE%" -p "%SIGN_PASSWORD%" -fd sha256 -d "AdoptOpenJDK" -t %%s "ReleaseDir\!OUTPUT_BASE_FILENAME!.msi"
-		@ECHO ON
+        IF "%SIGN_TOOL%" == "ucl" (
+            ECHO Using UCL sign tool
+            ucl sign-code --file "ReleaseDir\!OUTPUT_BASE_FILENAME!.msi" -n WindowsSHA -t %%s --hash SHA256
+        ) ELSE (
+            @ECHO OFF
+            "%ProgramFiles(x86)%\Windows Kits\%WIN_SDK_MAJOR_VERSION%\bin\%WIN_SDK_FULL_VERSION%\x64\signtool.exe" sign -f "%SIGNING_CERTIFICATE%" -p "%SIGN_PASSWORD%" -fd sha256 -d "AdoptOpenJDK" -t %%s "ReleaseDir\!OUTPUT_BASE_FILENAME!.msi"
+            @ECHO ON
+        )
 		IF NOT "%DEBUG%" == "true" @ECHO OFF
 
                 REM check the return value of the timestamping operation and retry a max of ten times...
@@ -350,10 +360,13 @@ FOR %%A IN (%ARCH%) DO (
     echo sign.bat exit code is 0. There were %timestampErrors% timestamping errors.
 
     REM Remove files we do not need any longer.
-    DEL "Files-!OUTPUT_BASE_FILENAME!.wxs"
-    DEL "Files-!OUTPUT_BASE_FILENAME!.wixobj"
-    DEL "Main-!OUTPUT_BASE_FILENAME!.wxs"
-    DEL "Main-!OUTPUT_BASE_FILENAME!.wixobj"
+    DEL "%WORKDIR%!OUTPUT_BASE_FILENAME!-Files.wxs"
+    DEL "%WORKDIR%!OUTPUT_BASE_FILENAME!-Files.wixobj"
+    DEL "%WORKDIR%!OUTPUT_BASE_FILENAME!-Main.wxs"
+    DEL "%WORKDIR%!OUTPUT_BASE_FILENAME!-Main.wixobj"
+    DEL "%WORKDIR%!OUTPUT_BASE_FILENAME!-!PRODUCT_SKU!.%JVM%.*.wxl"
+    DEL "%WORKDIR%!OUTPUT_BASE_FILENAME!-!PRODUCT_SKU!.Base.*.wxl"
+    DEL "%WORKDIR%!OUTPUT_BASE_FILENAME!-!PRODUCT_SKU!.Variables.wxi"
     IF DEFINED ITW_WXS (
         DEL !ITW_WXS!
         DEL !ITW_WIXOBJ!

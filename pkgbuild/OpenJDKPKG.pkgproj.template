@@ -206,7 +206,7 @@
             <key>LAYOUT_DIRECTION</key>
             <integer>0</integer>
             <key>SCALING</key>
-            <integer>0</integer>
+            <integer>1</integer>
           </dict>
         </dict>
         <key>BACKGROUND_PATH</key>
@@ -221,7 +221,7 @@
         <key>LAYOUT_DIRECTION</key>
         <integer>0</integer>
         <key>SCALING</key>
-        <integer>0</integer>
+        <integer>1</integer>
         <key>SHARED_SETTINGS_FOR_ALL_APPAREANCES</key>
         <true/>
       </dict>

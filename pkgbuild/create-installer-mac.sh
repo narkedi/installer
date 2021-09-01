@@ -47,8 +47,11 @@ do tar -xf "$f";
     *hotspot*)
       export JVM="hotspot"
     ;;
-    *openj9*)
+    *semeru*)
       export JVM="openj9"
+      export VENDOR="ibm-semeru-open"
+      export PACKAGE_NAME="IBM Semeru Runtime Open Edition"
+      export LOGO="Resources/ibm.png"
     ;;
   esac
 
@@ -66,11 +69,11 @@ do tar -xf "$f";
   file=${f%%.tar.gz*}
 
   if [ -z "$SIGN_CMD" ]; then
-    echo running "./packagesbuild.sh --major_version ${MAJOR_VERSION} --full_version ${FULL_VERSION} --input_directory ${directory} --output_directory ${file}.pkg --jvm ${JVM} --type ${TYPE}"
-    ./packagesbuild.sh --major_version ${MAJOR_VERSION} --full_version ${FULL_VERSION} --input_directory ${directory} --output_directory ${file}.pkg --jvm ${JVM} --type ${TYPE}
+    echo running "./packagesbuild.sh --major_version ${MAJOR_VERSION} --full_version ${FULL_VERSION} --input_directory ${directory} --output_directory ${file}.pkg --jvm ${JVM} --type ${TYPE} --vendor ${VENDOR} --package-name "${PACKAGE_NAME}" --logo ${LOGO}"
+    ./packagesbuild.sh --major_version ${MAJOR_VERSION} --full_version ${FULL_VERSION} --input_directory ${directory} --output_directory ${file}.pkg --jvm ${JVM} --type ${TYPE} --vendor ${VENDOR} --package-name "${PACKAGE_NAME}" --logo ${LOGO}
   else
-    echo running "./packagesbuild.sh ${SIGN_CMD} "${SIGN_CERT}" --major_version ${MAJOR_VERSION} --full_version ${FULL_VERSION} --input_directory ${directory} --output_directory ${file}.pkg --jvm ${JVM} --type ${TYPE}"
-    ./packagesbuild.sh ${SIGN_CMD} "${SIGN_CERT}" --major_version ${MAJOR_VERSION} --full_version ${FULL_VERSION} --input_directory ${directory} --output_directory ${file}.pkg --jvm ${JVM} --type ${TYPE}
+    echo running "./packagesbuild.sh ${SIGN_CMD} "${SIGN_CERT}" --major_version ${MAJOR_VERSION} --full_version ${FULL_VERSION} --input_directory ${directory} --output_directory ${file}.pkg --jvm ${JVM} --type ${TYPE} --vendor ${VENDOR} --package-name "${PACKAGE_NAME}" --logo ${LOGO}"
+    ./packagesbuild.sh ${SIGN_CMD} "${SIGN_CERT}" --major_version ${MAJOR_VERSION} --full_version ${FULL_VERSION} --input_directory ${directory} --output_directory ${file}.pkg --jvm ${JVM} --type ${TYPE} --vendor ${VENDOR} --package-name "${PACKAGE_NAME}" --logo ${LOGO}
   fi
 
   rm -rf ${directory}
